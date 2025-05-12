@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Configuración</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --primary: #4e73df;
+      --primary-hover: #2e59d9;
+      --danger: #e74a3b;
+      --bg: #f8f9fc;
+      --text: #333;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: 'Poppins', sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 2rem;
+    }
+    .container {
+      max-width: 480px; width: 100%;
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+      padding: 2rem; opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 0.6s forwards;
+    }
+    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+    h2 { margin-top: 0; color: var(--primary); text-align: center; }
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; margin-bottom: .25rem; font-weight: 600; }
+    input {
+      width: 100%; padding: .75rem;
+      border: 1px solid #ddd; border-radius: 8px;
+      transition: border-color .3s, box-shadow .3s;
+    }
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 5px rgba(78,115,223,0.5);
+      outline: none;
+    }
+    button {
+      width: 100%; padding: .75rem;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer;
+      transition: background .3s;
+    }
+    button:hover { background: var(--primary-hover); }
+    .danger {
+      background: var(--danger); margin-top: 1rem;
+    }
+    .danger:hover { background: #c0392b; }
+    .message {
+      margin-top: 1rem; padding: .75rem;
+      border-radius: 6px; display: none; text-align: center;
+    }
+    .message.error   { background: #fdecea; color: #b71c1c; }
+    .message.success { background: #eafaf1; color: #1e4620; }
+    #verify-section { display: none; }
+    #btn-back {
+      display: block; width: 100%; padding: .75rem;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer;
+      transition: background .3s, transform .2s;
+      margin-top: 1rem;
+    }
+    #btn-back:hover { transform: scale(1.05); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Configuración de cuenta</h2>
+    <div id="msg" class="message"></div>
+
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" required />
+      </div>
+      <div class="form-group">
+        <label for="current-password">Contraseña actual</label>
+        <input type="password" id="current-password" required />
+      </div>
+      <div class="form-group">
+        <label for="new-password">Nueva contraseña</label>
+        <input type="password" id="new-password" />
+      </div>
+      <button type="submit">Guardar cambios</button>
+    </form>
+
+    <div id="verify-section">
+      <p style="text-align:center;">Te hemos enviado un código de confirmación a tu correo. Introduce el código para aplicar el cambio:</p>
+      <div class="form-group">
+        <input type="text" id="verify-code" placeholder="Código de confirmación" />
+      </div>
+      <button id="verify-button">Confirmar cambio</button>
+    </div>
+
+    <button id="logout" class="danger">Cerrar sesión</button>
+    <button id="delete-account" class="danger">Eliminar cuenta</button>
+    <button id="btn-back" type="button">Volver</button>
+  </div>
+
+  <script>
+    const key = localStorage.getItem('loggedUser') || sessionStorage.getItem('sessionUser');
+    if (!key) return window.location.href = 'session.html';
+    const user = JSON.parse(localStorage.getItem(key) || '{}');
+    document.getElementById('email').value = user.email || '';
+
+    const form       = document.getElementById('settings-form');
+    const verifySec  = document.getElementById('verify-section');
+    const verifyBtn  = document.getElementById('verify-button');
+    const msg        = document.getElementById('msg');
+    let confirmationCode = '';
+
+    function showMessage(text, type) {
+      msg.textContent = text;
+      msg.className   = 'message ' + type;
+      msg.style.display = 'block';
+      setTimeout(() => msg.style.display = 'none', 4000);
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const email       = document.getElementById('email').value.trim();
+      const currentPass = document.getElementById('current-password').value;
+      const newPass     = document.getElementById('new-password').value;
+      const keep        = document.getElementById('keep-logged')?.checked;
+
+      if (!email || !currentPass) return showMessage('Email y contraseña actual son obligatorios.', 'error');
+      if (user.password !== currentPass) return showMessage('Contraseña actual incorrecta.', 'error');
+      
+      user.email = email;
+      localStorage.setItem(key, JSON.stringify(user));
+
+      if (!newPass) {
+        if (keep) localStorage.setItem('loggedUser', key);
+        else sessionStorage.setItem('sessionUser', key);
+        return showMessage('Email actualizado correctamente.', 'success');
+      }
+
+      confirmationCode = Math.floor(100000 + Math.random()*900000).toString();
+      fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id:    'TU_SERVICE_ID',
+          template_id:   'TU_TEMPLATE_ID_CONFIRM',
+          user_id:       'TU_EMAILJS_PUBLIC_KEY',
+          template_params: { to_email: key, confirmation_code: confirmationCode }
+        })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        form.style.display = 'none';
+        verifySec.style.display = 'block';
+        showMessage('Código enviado. Revisa tu email.', 'success');
+      })
+      .catch(err => showMessage('Error al enviar correo: ' + err.message, 'error'));
+    });
+
+    verifyBtn.addEventListener('click', () => {
+      const code = document.getElementById('verify-code').value.trim();
+      if (code !== confirmationCode) return showMessage('Código incorrecto.', 'error');
+      const newPass = document.getElementById('new-password').value;
+      user.password = newPass;
+      localStorage.setItem(key, JSON.stringify(user));
+      showMessage('Contraseña actualizada correctamente.', 'success');
+      if (document.getElementById('keep-logged')?.checked) localStorage.setItem('loggedUser', key);
+      else sessionStorage.setItem('sessionUser', key);
+      setTimeout(() => window.location.href = 'content.html', 1000);
+    });
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('loggedUser'); sessionStorage.removeItem('sessionUser');
+      window.location.href = 'session.html';
+    });
+    document.getElementById('delete-account').addEventListener('click', () => {
+      if (confirm('¿Seguro que quieres eliminar tu cuenta?')) {
+        localStorage.removeItem(key); localStorage.removeItem('loggedUser'); sessionStorage.removeItem('sessionUser');
+        window.location.href = 'session.html';
+      }
+    });
+    document.getElementById('btn-back').addEventListener('click', () => {
+      window.location.href = 'content.html';
+    });
+  </script>
+</body>
+</html>
